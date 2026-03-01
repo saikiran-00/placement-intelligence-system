@@ -1,0 +1,14 @@
+{
+  "name": "6th-sem-project",
+  "version": "1.0.0",
+  "description": "Placement Intelligence System Backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
