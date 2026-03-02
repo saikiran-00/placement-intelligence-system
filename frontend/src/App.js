@@ -29,7 +29,7 @@ function App() {
   };
 
   const fetchUsers = () => {
-    fetch("http://localhost:5000/users")
+    fetch("https://placement-intelligence-system-qdov.onrender.com/users")
       .then(res => res.json())
       .then(data => setUsers(data))
       .catch(err => console.log(err));
@@ -45,7 +45,7 @@ function App() {
       return;
     }
 
-    await fetch("http://localhost:5000/register", {
+    await fetch("https://placement-intelligence-system-qdov.onrender.com/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
