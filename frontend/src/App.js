@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from "react";
 import AptitudeTest from "./AptitudeTest";
 import {
-  PieChart,
-  Pie,
-  Cell,
   Tooltip,
-  Legend,
   BarChart,
   Bar,
   XAxis,
