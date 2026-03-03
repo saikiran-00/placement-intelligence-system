@@ -46,19 +46,19 @@ app.post("/register", async (req, res) => {
       codingScore
     } = req.body;
 
-    if (!name || !email || !password || !cgpa || aptitudeScore == null || codingScore == null) {
-      return res.status(400).json({ message: "All fields required" });
-    }
+    if (!name || !email || !password)
+      return res.status(400).json({ message: "Name, email & password required" });
 
     const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ message: "Email already exists" });
+    if (existingUser)
+      return res.status(400).json({ message: "Email already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const placementScore =
-      0.4 * codingScore +
-      0.3 * aptitudeScore +
-      0.3 * (cgpa * 10);
+      0.4 * (codingScore || 0) +
+      0.3 * (aptitudeScore || 0) +
+      0.3 * ((cgpa || 0) * 10);
 
     let category = "High Risk";
     if (placementScore >= 75) category = "Placement Ready";
@@ -69,9 +69,9 @@ app.post("/register", async (req, res) => {
       email,
       password: hashedPassword,
       role: role || "student",
-      cgpa,
-      aptitudeScore,
-      codingScore,
+      cgpa: cgpa || 0,
+      aptitudeScore: aptitudeScore || 0,
+      codingScore: codingScore || 0,
       placementScore,
       category,
       improvementPlan: []
@@ -114,6 +114,30 @@ app.post("/login", async (req, res) => {
   }
 });
 
+// ================= RESET PASSWORD =================
+app.put("/reset-password", async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword)
+      return res.status(400).json({ message: "Email and new password required" });
+
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+
+    await user.save();
+
+    res.json({ message: "Password updated successfully" });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ================= GET USERS (PRIVATE SCORES) =================
 app.get("/users", auth, async (req, res) => {
   try {
@@ -134,17 +158,11 @@ app.put("/update-score/:id", auth, async (req, res) => {
   try {
     const { aptitudeScore, codingScore } = req.body;
 
-    if (aptitudeScore == null || codingScore == null) {
-      return res.status(400).json({ message: "Scores are required" });
-    }
-
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Only admin OR same student can update
-    if (req.user.role !== "admin" && req.user.id !== user._id.toString()) {
+    if (req.user.role !== "admin" && req.user.id !== user._id.toString())
       return res.status(403).json({ message: "Not allowed" });
-    }
 
     user.aptitudeScore = aptitudeScore;
     user.codingScore = codingScore;
@@ -158,33 +176,39 @@ app.put("/update-score/:id", auth, async (req, res) => {
     else if (user.placementScore < 75) user.category = "Needs Improvement";
     else user.category = "Placement Ready";
 
-    // Generate Improvement Plan
-    let plan = [];
-
-    if (aptitudeScore >= 75) {
-      plan = [
-        { day: "Day 1", task: "Solve 2 mock tests", completed: false },
-        { day: "Day 2", task: "Practice HR interview questions", completed: false },
-        { day: "Day 3", task: "Revise formulas", completed: false }
-      ];
-    } else if (aptitudeScore >= 50) {
-      plan = [
-        { day: "Day 1", task: "Arithmetic practice (20 questions)", completed: false },
-        { day: "Day 2", task: "Logical reasoning basics", completed: false },
-        { day: "Day 3", task: "Mini mock test", completed: false }
-      ];
-    } else {
-      plan = [
-        { day: "Day 1-2", task: "Basic arithmetic concepts", completed: false },
-        { day: "Day 3-4", task: "Logical reasoning foundation", completed: false }
-      ];
-    }
-
-    user.improvementPlan = plan;
+    // Generate improvement plan
+    user.improvementPlan = [
+      { task: "Practice aptitude daily", completed: false },
+      { task: "Solve coding problems", completed: false },
+      { task: "Revise core subjects", completed: false }
+    ];
 
     await user.save();
 
     res.json({ message: "Score updated", user });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ================= UPDATE TASK STATUS =================
+app.put("/update-task/:userId/:index", auth, async (req, res) => {
+  try {
+    const { userId, index } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (req.user.role !== "admin" && req.user.id !== user._id.toString())
+      return res.status(403).json({ message: "Not allowed" });
+
+    user.improvementPlan[index].completed =
+      !user.improvementPlan[index].completed;
+
+    await user.save();
+
+    res.json(user);
 
   } catch (err) {
     res.status(500).json({ error: err.message });
