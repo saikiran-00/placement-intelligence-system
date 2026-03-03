@@ -12,14 +12,7 @@ import {
   Box,
   MenuItem
 } from "@mui/material";
-import {
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid
-} from "recharts";
+
 
 function App({ darkMode, toggleDarkMode }) {
 
