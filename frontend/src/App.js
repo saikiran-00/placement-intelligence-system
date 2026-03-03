@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Login from "./Login";
 import Layout from "./components/Layout";
 import AptitudeTest from "./AptitudeTest";
@@ -44,27 +44,28 @@ function App({ darkMode, toggleDarkMode }) {
   const [filterCategory, setFilterCategory] = useState("All");
 
   // ================= FETCH USERS =================
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch(`${API}/users`, {
-        headers: {
-          Authorization: token
-        }
-      });
+  const fetchUsers = useCallback(async () => {
+  try {
+    const res = await fetch(`${API}/users`, {
+      headers: {
+        Authorization: localStorage.getItem("token")
+      }
+    });
 
-      const data = await res.json();
-      if (res.ok) setUsers(data);
-      else console.log(data.message);
+    const data = await res.json();
+    if (res.ok) setUsers(data);
+    else console.log(data.message);
 
-    } catch (err) {
-      console.log(err);
-    }
-  };
+  } catch (err) {
+    console.log(err);
+  }
+}, [API]);
 
   useEffect(() => {
-    if (isLoggedIn) fetchUsers();
-  }, [isLoggedIn]);
-
+  if (isLoggedIn) {
+    fetchUsers();
+  }
+}, [isLoggedIn, fetchUsers]);
   // ================= ADD / EDIT =================
   const handleAddStudent = async () => {
     if (!name || !email || !cgpa || !aptitude || !coding) {
