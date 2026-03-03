@@ -13,16 +13,20 @@ import {
   MenuItem
 } from "@mui/material";
 
-
 function App({ darkMode, toggleDarkMode }) {
 
-  // ================= LOGIN =================
+  const API = "https://placement-intelligence-system-qdov.onrender.com";
+
+  // ================= AUTH =================
   const [isLoggedIn, setIsLoggedIn] = useState(
     localStorage.getItem("isLoggedIn") === "true"
   );
 
+  const role = localStorage.getItem("role");
+  const token = localStorage.getItem("token");
+
   const handleLogout = () => {
-    localStorage.removeItem("isLoggedIn");
+    localStorage.clear();
     setIsLoggedIn(false);
   };
 
@@ -39,13 +43,22 @@ function App({ darkMode, toggleDarkMode }) {
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
 
-  const API = "https://placement-intelligence-system-qdov.onrender.com";
+  // ================= FETCH USERS =================
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch(`${API}/users`, {
+        headers: {
+          Authorization: token
+        }
+      });
 
-  const fetchUsers = () => {
-    fetch(`${API}/users`)
-      .then(res => res.json())
-      .then(data => setUsers(data))
-      .catch(err => console.log(err));
+      const data = await res.json();
+      if (res.ok) setUsers(data);
+      else console.log(data.message);
+
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   useEffect(() => {
@@ -59,42 +72,66 @@ function App({ darkMode, toggleDarkMode }) {
       return;
     }
 
-    if (editingUser) {
-      await fetch(`${API}/update-score/${editingUser}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          aptitudeScore: Number(aptitude),
-          codingScore: Number(coding)
-        })
-      });
-      setEditingUser(null);
-    } else {
-      await fetch(`${API}/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          email,
-          cgpa: Number(cgpa),
-          aptitudeScore: Number(aptitude),
-          codingScore: Number(coding)
-        })
-      });
-    }
+    try {
+      if (editingUser) {
+        await fetch(`${API}/update-score/${editingUser}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: token
+          },
+          body: JSON.stringify({
+            aptitudeScore: Number(aptitude),
+            codingScore: Number(coding)
+          })
+        });
 
-    setName("");
-    setEmail("");
-    setCgpa("");
-    setAptitude("");
-    setCoding("");
-    fetchUsers();
+        setEditingUser(null);
+      } else {
+        await fetch(`${API}/register`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name,
+            email,
+            password: "123456", // default password
+            role: "student",
+            cgpa: Number(cgpa),
+            aptitudeScore: Number(aptitude),
+            codingScore: Number(coding)
+          })
+        });
+      }
+
+      setName("");
+      setEmail("");
+      setCgpa("");
+      setAptitude("");
+      setCoding("");
+
+      fetchUsers();
+
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   // ================= DELETE =================
   const handleDelete = async (id) => {
-    await fetch(`${API}/delete/${id}`, { method: "DELETE" });
-    fetchUsers();
+    try {
+      await fetch(`${API}/delete/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: token
+        }
+      });
+
+      fetchUsers();
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   const handleEdit = (user) => {
@@ -109,7 +146,7 @@ function App({ darkMode, toggleDarkMode }) {
   // ================= FILTER =================
   const filteredUsers = users.filter((user) => {
     const matchSearch = user.name
-      .toLowerCase()
+      ?.toLowerCase()
       .includes(search.toLowerCase());
 
     const matchCategory =
@@ -145,11 +182,7 @@ function App({ darkMode, toggleDarkMode }) {
             {darkMode ? "Light Mode" : "Dark Mode"}
           </Button>
 
-          <Button
-            variant="outlined"
-            color="error"
-            onClick={handleLogout}
-          >
+          <Button variant="outlined" color="error" onClick={handleLogout}>
             Logout
           </Button>
         </Box>
@@ -177,39 +210,41 @@ function App({ darkMode, toggleDarkMode }) {
           ))}
         </Grid>
 
-        {/* ADD STUDENT */}
-        <Card sx={{ mb: 4 }}>
-          <CardContent>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              {editingUser ? "Edit Student" : "Add Student"}
-            </Typography>
+        {/* ADD STUDENT (ADMIN ONLY) */}
+        {role === "admin" && (
+          <Card sx={{ mb: 4 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                {editingUser ? "Edit Student" : "Add Student"}
+              </Typography>
 
-            <Grid container spacing={2}>
-              {[
-                { label: "Name", value: name, set: setName },
-                { label: "Email", value: email, set: setEmail },
-                { label: "CGPA", value: cgpa, set: setCgpa },
-                { label: "Aptitude", value: aptitude, set: setAptitude },
-                { label: "Coding", value: coding, set: setCoding }
-              ].map((field, i) => (
-                <Grid item xs={12} md={2} key={i}>
-                  <TextField
-                    fullWidth
-                    label={field.label}
-                    value={field.value}
-                    onChange={(e) => field.set(e.target.value)}
-                  />
+              <Grid container spacing={2}>
+                {[
+                  { label: "Name", value: name, set: setName },
+                  { label: "Email", value: email, set: setEmail },
+                  { label: "CGPA", value: cgpa, set: setCgpa },
+                  { label: "Aptitude", value: aptitude, set: setAptitude },
+                  { label: "Coding", value: coding, set: setCoding }
+                ].map((field, i) => (
+                  <Grid item xs={12} md={2} key={i}>
+                    <TextField
+                      fullWidth
+                      label={field.label}
+                      value={field.value}
+                      onChange={(e) => field.set(e.target.value)}
+                    />
+                  </Grid>
+                ))}
+
+                <Grid item xs={12} md={2}>
+                  <Button variant="contained" fullWidth onClick={handleAddStudent}>
+                    {editingUser ? "Update" : "Add"}
+                  </Button>
                 </Grid>
-              ))}
-
-              <Grid item xs={12} md={2}>
-                <Button variant="contained" fullWidth onClick={handleAddStudent}>
-                  {editingUser ? "Update" : "Add"}
-                </Button>
               </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* SEARCH + FILTER */}
         <Card sx={{ mb: 3 }}>
@@ -251,19 +286,28 @@ function App({ darkMode, toggleDarkMode }) {
                   <Typography variant="h6">{user.name}</Typography>
                   <Typography>Email: {user.email}</Typography>
                   <Typography>CGPA: {user.cgpa}</Typography>
+
                   <Typography>Score: {user.placementScore?.toFixed(2)}</Typography>
+
                   <Typography sx={{ mb: 2 }}>
                     {getRecommendation(user.placementScore)}
                   </Typography>
 
-                  <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-                    <Button variant="outlined" onClick={() => handleEdit(user)}>
-                      Edit
-                    </Button>
-                    <Button variant="outlined" color="error" onClick={() => handleDelete(user._id)}>
-                      Delete
-                    </Button>
-                  </Box>
+                  {role === "admin" && (
+                    <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+                      <Button variant="outlined" onClick={() => handleEdit(user)}>
+                        Edit
+                      </Button>
+
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => handleDelete(user._id)}
+                      >
+                        Delete
+                      </Button>
+                    </Box>
+                  )}
 
                   <Button
                     variant="outlined"
@@ -281,6 +325,7 @@ function App({ darkMode, toggleDarkMode }) {
                       }}
                     />
                   )}
+
                 </CardContent>
               </Card>
             </Grid>
