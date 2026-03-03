@@ -5,7 +5,8 @@ import {
   TextField,
   Button,
   Typography,
-  Box
+  Box,
+  CircularProgress
 } from "@mui/material";
 
 const API = "https://placement-intelligence-system-qdov.onrender.com";
@@ -15,70 +16,102 @@ function Login({ onLogin }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // ================= LOGIN =================
   const handleLogin = async () => {
-    const res = await fetch(`${API}/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
+    try {
+      setLoading(true);
 
-    const data = await res.json();
+      const res = await fetch(`${API}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
 
-    if (res.ok) {
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("role", data.role);
-      localStorage.setItem("isLoggedIn", "true");
-      onLogin();
-    } else {
-      alert(data.message);
+      const data = await res.json();
+      console.log("Login response:", data);
+
+      if (res.ok) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("role", data.role);
+        localStorage.setItem("isLoggedIn", "true");
+        alert("Login successful ✅");
+        onLogin();
+      } else {
+        alert(data.message || data.error || "Login failed");
+      }
+
+    } catch (error) {
+      console.log("Login error:", error);
+      alert("Server error. Try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   // ================= REGISTER =================
   const handleRegister = async () => {
-    const res = await fetch(`${API}/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        email,
-        password,
-        cgpa: 0,
-        aptitudeScore: 0,
-        codingScore: 0
-      })
-    });
+    try {
+      setLoading(true);
 
-    const data = await res.json();
+      const res = await fetch(`${API}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          email,
+          password
+        })
+      });
 
-    if (res.ok) {
-      alert("Account created! Please login.");
-      setMode("login");
-    } else {
-      alert(data.message);
+      const data = await res.json();
+      console.log("Register response:", data);
+
+      if (res.ok) {
+        alert("Account created! Please login.");
+        setMode("login");
+      } else {
+        alert(data.message || data.error || "Registration failed");
+      }
+
+    } catch (error) {
+      console.log("Register error:", error);
+      alert("Server error. Try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // ================= RESET =================
+  // ================= RESET PASSWORD =================
   const handleReset = async () => {
-    const res = await fetch(`${API}/reset-password`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        newPassword: password
-      })
-    });
+    try {
+      setLoading(true);
 
-    const data = await res.json();
+      const res = await fetch(`${API}/reset-password`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          newPassword: password
+        })
+      });
 
-    if (res.ok) {
-      alert("Password updated! Please login.");
-      setMode("login");
-    } else {
-      alert(data.message);
+      const data = await res.json();
+      console.log("Reset response:", data);
+
+      if (res.ok) {
+        alert("Password updated! Please login.");
+        setMode("login");
+      } else {
+        alert(data.message || data.error || "Reset failed");
+      }
+
+    } catch (error) {
+      console.log("Reset error:", error);
+      alert("Server error. Try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -119,22 +152,30 @@ function Login({ onLogin }) {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        {mode === "login" && (
-          <Button fullWidth variant="contained" onClick={handleLogin}>
-            Login
-          </Button>
-        )}
+        {loading ? (
+          <Box sx={{ textAlign: "center", mt: 2 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            {mode === "login" && (
+              <Button fullWidth variant="contained" onClick={handleLogin}>
+                Login
+              </Button>
+            )}
 
-        {mode === "register" && (
-          <Button fullWidth variant="contained" onClick={handleRegister}>
-            Create Account
-          </Button>
-        )}
+            {mode === "register" && (
+              <Button fullWidth variant="contained" onClick={handleRegister}>
+                Create Account
+              </Button>
+            )}
 
-        {mode === "reset" && (
-          <Button fullWidth variant="contained" onClick={handleReset}>
-            Reset Password
-          </Button>
+            {mode === "reset" && (
+              <Button fullWidth variant="contained" onClick={handleReset}>
+                Reset Password
+              </Button>
+            )}
+          </>
         )}
 
         <Box sx={{ mt: 2, textAlign: "center" }}>
