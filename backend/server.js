@@ -24,7 +24,7 @@ const auth = (req, res, next) => {
     req.user = verified;
     next();
   } catch {
-    res.status(400).json({ message: "Invalid token" });
+    return res.status(400).json({ message: "Invalid token" });
   }
 };
 
@@ -55,10 +55,14 @@ app.post("/register", async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    const finalCgpa = cgpa || 0;
+    const finalAptitude = aptitudeScore || 0;
+    const finalCoding = codingScore || 0;
+
     const placementScore =
-      0.4 * (codingScore || 0) +
-      0.3 * (aptitudeScore || 0) +
-      0.3 * ((cgpa || 0) * 10);
+      0.4 * finalCoding +
+      0.3 * finalAptitude +
+      0.3 * (finalCgpa * 10);
 
     let category = "High Risk";
     if (placementScore >= 75) category = "Placement Ready";
@@ -69,9 +73,9 @@ app.post("/register", async (req, res) => {
       email,
       password: hashedPassword,
       role: role || "student",
-      cgpa: cgpa || 0,
-      aptitudeScore: aptitudeScore || 0,
-      codingScore: codingScore || 0,
+      cgpa: finalCgpa,
+      aptitudeScore: finalAptitude,
+      codingScore: finalCoding,
       placementScore,
       category,
       improvementPlan: []
@@ -103,11 +107,7 @@ app.post("/login", async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    res.json({
-      token,
-      role: user.role,
-      id: user._id
-    });
+    res.json({ token, role: user.role, id: user._id });
 
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -126,9 +126,7 @@ app.put("/reset-password", async (req, res) => {
     if (!user)
       return res.status(404).json({ message: "User not found" });
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedPassword;
-
+    user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
     res.json({ message: "Password updated successfully" });
@@ -138,7 +136,7 @@ app.put("/reset-password", async (req, res) => {
   }
 });
 
-// ================= GET USERS (PRIVATE SCORES) =================
+// ================= GET USERS =================
 app.get("/users", auth, async (req, res) => {
   try {
     if (req.user.role === "admin") {
@@ -156,7 +154,7 @@ app.get("/users", auth, async (req, res) => {
 // ================= UPDATE SCORE =================
 app.put("/update-score/:id", auth, async (req, res) => {
   try {
-    const { aptitudeScore, codingScore } = req.body;
+    const { aptitudeScore = 0, codingScore = 0 } = req.body;
 
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -176,39 +174,9 @@ app.put("/update-score/:id", auth, async (req, res) => {
     else if (user.placementScore < 75) user.category = "Needs Improvement";
     else user.category = "Placement Ready";
 
-    // Generate improvement plan
-    user.improvementPlan = [
-      { task: "Practice aptitude daily", completed: false },
-      { task: "Solve coding problems", completed: false },
-      { task: "Revise core subjects", completed: false }
-    ];
-
     await user.save();
 
     res.json({ message: "Score updated", user });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ================= UPDATE TASK STATUS =================
-app.put("/update-task/:userId/:index", auth, async (req, res) => {
-  try {
-    const { userId, index } = req.params;
-
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    if (req.user.role !== "admin" && req.user.id !== user._id.toString())
-      return res.status(403).json({ message: "Not allowed" });
-
-    user.improvementPlan[index].completed =
-      !user.improvementPlan[index].completed;
-
-    await user.save();
-
-    res.json(user);
 
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -236,7 +204,4 @@ mongoose.connect(process.env.MONGO_URI)
 
 // ================= SERVER =================
 const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
