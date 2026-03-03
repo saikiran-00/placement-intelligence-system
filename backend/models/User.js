@@ -1,22 +1,39 @@
 const mongoose = require("mongoose");
 
-const userSchema = new mongoose.Schema({
-  name: String,
-  email: String,
-  cgpa: Number,
-  aptitudeScore: { type: Number, default: 0 },
-  codingScore: { type: Number, default: 0 },
-  placementScore: { type: Number, default: 0 },
-  category: { type: String, default: "High Risk" },
-
-  // 🔥 NEW FIELD
-  improvementPlan: [
-    {
-      day: String,
-      task: String,
-      completed: { type: Boolean, default: false }
-    }
-  ]
+const improvementSchema = new mongoose.Schema({
+  day: { type: String },
+  task: { type: String },
+  completed: { type: Boolean, default: false }
 });
+
+const userSchema = new mongoose.Schema(
+  {
+    // Basic Info
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+
+    // Auth
+    password: { type: String, required: true },
+
+    role: {
+      type: String,
+      enum: ["admin", "student"],
+      default: "student"
+    },
+
+    // Academic Info
+    cgpa: { type: Number, required: true },
+    aptitudeScore: { type: Number, required: true },
+    codingScore: { type: Number, required: true },
+
+    // Placement Logic
+    placementScore: { type: Number },
+    category: { type: String },
+
+    // Improvement Plan
+    improvementPlan: [improvementSchema]
+  },
+  { timestamps: true }
+);
 
 module.exports = mongoose.model("User", userSchema);
