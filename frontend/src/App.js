@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Login from "./Login";
 import Layout from "./components/Layout";
+import AptitudeTest from "./AptitudeTest";
 
 import {
   Grid,
@@ -27,10 +28,12 @@ function App({ darkMode, toggleDarkMode }) {
 
   const API = "https://placement-intelligence-system-qdov.onrender.com";
 
+  // ================= AUTH =================
   const [isLoggedIn, setIsLoggedIn] = useState(
     localStorage.getItem("isLoggedIn") === "true"
   );
 
+  const role = localStorage.getItem("role");
   const token = localStorage.getItem("token");
 
   const handleLogout = () => {
@@ -38,13 +41,27 @@ function App({ darkMode, toggleDarkMode }) {
     window.location.reload();
   };
 
+  // ================= STATES =================
   const [users, setUsers] = useState([]);
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [cgpa, setCgpa] = useState("");
+  const [aptitude, setAptitude] = useState("");
+  const [coding, setCoding] = useState("");
+
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [editingUser, setEditingUser] = useState(null);
+
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
+
   const [completedTasks, setCompletedTasks] = useState({});
 
+  // ================= FETCH USERS =================
   const fetchUsers = useCallback(async () => {
-
     try {
 
       const res = await fetch(`${API}/users`, {
@@ -65,11 +82,103 @@ function App({ darkMode, toggleDarkMode }) {
     if (isLoggedIn) fetchUsers();
   }, [isLoggedIn, fetchUsers]);
 
+  // ================= ADD / EDIT =================
+  const handleAddStudent = async () => {
+
+    if (!name || !email || !cgpa || !aptitude || !coding) {
+      alert("Fill all fields");
+      return;
+    }
+
+    try {
+
+      if (editingUser) {
+
+        await fetch(`${API}/update-score/${editingUser}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: token
+          },
+          body: JSON.stringify({
+            aptitudeScore: Number(aptitude),
+            codingScore: Number(coding)
+          })
+        });
+
+        setEditingUser(null);
+
+      } else {
+
+        await fetch(`${API}/create-student`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: token
+          },
+          body: JSON.stringify({
+            name,
+            email,
+            password: password || "123456",
+            cgpa: Number(cgpa),
+            aptitudeScore: Number(aptitude),
+            codingScore: Number(coding)
+          })
+        });
+
+      }
+
+      setName("");
+      setEmail("");
+      setPassword("");
+      setCgpa("");
+      setAptitude("");
+      setCoding("");
+
+      fetchUsers();
+
+    } catch (err) {
+      console.log(err);
+    }
+
+  };
+
+  // ================= DELETE =================
+  const handleDelete = async (id) => {
+
+    try {
+
+      await fetch(`${API}/delete/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: token }
+      });
+
+      fetchUsers();
+
+    } catch (err) {
+      console.log(err);
+    }
+
+  };
+
+  const handleEdit = (user) => {
+
+    setEditingUser(user._id);
+    setName(user.name);
+    setEmail(user.email);
+    setCgpa(user.cgpa);
+    setAptitude(user.aptitudeScore);
+    setCoding(user.codingScore);
+
+  };
+
+  // ================= PROGRESS =================
   const getProbability = (score) => {
     if (!score) return 0;
     return Math.min(score, 100);
   };
 
+  // ================= CHART DATA =================
   const getChartData = (user) => [
     { name: "CGPA", value: user.cgpa * 10 },
     { name: "Aptitude", value: user.aptitudeScore },
@@ -77,6 +186,7 @@ function App({ darkMode, toggleDarkMode }) {
     { name: "Placement", value: user.placementScore }
   ];
 
+  // ================= STUDY PLAN =================
   const getStudyPlan = (user) => {
 
     if (user.placementScore >= 75) {
@@ -107,6 +217,7 @@ function App({ darkMode, toggleDarkMode }) {
     setCompletedTasks((prev) => {
 
       const userTasks = prev[userId] || [];
+
       userTasks[index] = !userTasks[index];
 
       return {
@@ -118,6 +229,7 @@ function App({ darkMode, toggleDarkMode }) {
 
   };
 
+  // ================= FILTER =================
   const filteredUsers = users.filter((user) => {
 
     const matchSearch =
@@ -146,11 +258,14 @@ function App({ darkMode, toggleDarkMode }) {
     if (!score) return "No Data";
 
     if (score >= 80) return "🏢 Product Companies";
+
     if (score >= 60) return "🏢 Service Companies";
 
     return "📚 Skill Training Required";
+
   };
 
+  // ================= LOGIN PROTECTION =================
   if (!isLoggedIn) {
     return <Login onLogin={() => setIsLoggedIn(true)} />;
   }
@@ -176,6 +291,8 @@ function App({ darkMode, toggleDarkMode }) {
         <Typography variant="h4" sx={{ mb: 3 }}>
           🚀 Placement Intelligence Dashboard
         </Typography>
+
+        {/* DASHBOARD */}
 
         <Grid container spacing={3} sx={{ mb: 4 }}>
 
@@ -208,6 +325,8 @@ function App({ darkMode, toggleDarkMode }) {
 
         </Grid>
 
+        {/* SEARCH */}
+
         <Card sx={{ mb: 3 }}>
           <CardContent>
 
@@ -219,7 +338,9 @@ function App({ darkMode, toggleDarkMode }) {
                   fullWidth
                   label="Search Student"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) =>
+                    setSearch(e.target.value)
+                  }
                 />
 
               </Grid>
@@ -250,6 +371,8 @@ function App({ darkMode, toggleDarkMode }) {
           </CardContent>
         </Card>
 
+        {/* STUDENTS */}
+
         <Grid container spacing={3}>
 
           {filteredUsers.map((user) => (
@@ -271,6 +394,8 @@ function App({ darkMode, toggleDarkMode }) {
                     Placement Score: {user.placementScore?.toFixed(2)}
                   </Typography>
 
+                  {/* Probability */}
+
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="body2">
                       Placement Probability
@@ -286,6 +411,8 @@ function App({ darkMode, toggleDarkMode }) {
                     {getRecommendation(user.placementScore)}
                   </Typography>
 
+                  {/* Chart */}
+
                   <BarChart
                     width={320}
                     height={200}
@@ -297,6 +424,8 @@ function App({ darkMode, toggleDarkMode }) {
                     <Tooltip />
                     <Bar dataKey="value" />
                   </BarChart>
+
+                  {/* Study Plan */}
 
                   <Typography variant="h6" sx={{ mt: 2 }}>
                     Study Plan
