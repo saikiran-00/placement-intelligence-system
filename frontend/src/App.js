@@ -11,7 +11,8 @@ import {
   TextField,
   Button,
   Box,
-  MenuItem
+  MenuItem,
+  LinearProgress
 } from "@mui/material";
 
 function App({ darkMode, toggleDarkMode }) {
@@ -33,8 +34,11 @@ function App({ darkMode, toggleDarkMode }) {
 
   // ================= STATES =================
   const [users, setUsers] = useState([]);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
   const [cgpa, setCgpa] = useState("");
   const [aptitude, setAptitude] = useState("");
   const [coding, setCoding] = useState("");
@@ -47,22 +51,21 @@ function App({ darkMode, toggleDarkMode }) {
 
   // ================= FETCH USERS =================
   const fetchUsers = useCallback(async () => {
+
     try {
 
       const res = await fetch(`${API}/users`, {
-        headers: {
-          Authorization: token
-        }
+        headers: { Authorization: token }
       });
 
       const data = await res.json();
 
       if (res.ok) setUsers(data);
-      else console.log(data.message);
 
     } catch (err) {
       console.log(err);
     }
+
   }, [API, token]);
 
   useEffect(() => {
@@ -73,7 +76,7 @@ function App({ darkMode, toggleDarkMode }) {
   const handleAddStudent = async () => {
 
     if (!name || !email || !cgpa || !aptitude || !coding) {
-      alert("Please fill all fields");
+      alert("Fill all fields");
       return;
     }
 
@@ -106,7 +109,7 @@ function App({ darkMode, toggleDarkMode }) {
           body: JSON.stringify({
             name,
             email,
-            password: "123456",
+            password: password || "123456",
             cgpa: Number(cgpa),
             aptitudeScore: Number(aptitude),
             codingScore: Number(coding)
@@ -117,6 +120,7 @@ function App({ darkMode, toggleDarkMode }) {
 
       setName("");
       setEmail("");
+      setPassword("");
       setCgpa("");
       setAptitude("");
       setCoding("");
@@ -126,6 +130,7 @@ function App({ darkMode, toggleDarkMode }) {
     } catch (err) {
       console.log(err);
     }
+
   };
 
   // ================= DELETE =================
@@ -135,9 +140,7 @@ function App({ darkMode, toggleDarkMode }) {
 
       await fetch(`${API}/delete/${id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: token
-        }
+        headers: { Authorization: token }
       });
 
       fetchUsers();
@@ -145,15 +148,18 @@ function App({ darkMode, toggleDarkMode }) {
     } catch (err) {
       console.log(err);
     }
+
   };
 
   const handleEdit = (user) => {
+
     setEditingUser(user._id);
     setName(user.name);
     setEmail(user.email);
     setCgpa(user.cgpa);
     setAptitude(user.aptitudeScore);
     setCoding(user.codingScore);
+
   };
 
   // ================= FILTER =================
@@ -166,6 +172,7 @@ function App({ darkMode, toggleDarkMode }) {
       filterCategory === "All" || user.category === filterCategory;
 
     return matchSearch && matchCategory;
+
   });
 
   const totalStudents = users.length;
@@ -180,10 +187,23 @@ function App({ darkMode, toggleDarkMode }) {
     users.filter((u) => u.category === "High Risk").length;
 
   const getRecommendation = (score) => {
+
     if (!score) return "No Data";
+
     if (score >= 80) return "🏢 Product Companies";
+
     if (score >= 60) return "🏢 Service Companies";
+
     return "📚 Skill Training Required";
+
+  };
+
+  const getProbability = (score) => {
+
+    if (!score) return 0;
+
+    return Math.min(score, 100);
+
   };
 
   // ================= LOGIN PROTECTION =================
@@ -192,6 +212,7 @@ function App({ darkMode, toggleDarkMode }) {
   }
 
   return (
+
     <Layout>
 
       <Box sx={{ padding: 3 }}>
@@ -221,6 +242,7 @@ function App({ darkMode, toggleDarkMode }) {
         {/* DASHBOARD */}
 
         <Grid container spacing={3} sx={{ mb: 4 }}>
+
           {[
             { title: "Total Students", value: totalStudents },
             { title: "Placement Ready", value: readyCount },
@@ -232,6 +254,7 @@ function App({ darkMode, toggleDarkMode }) {
 
               <Card>
                 <CardContent>
+
                   <Typography variant="h6">
                     {card.title}
                   </Typography>
@@ -246,6 +269,7 @@ function App({ darkMode, toggleDarkMode }) {
             </Grid>
 
           ))}
+
         </Grid>
 
         {/* ADD STUDENT */}
@@ -264,6 +288,7 @@ function App({ darkMode, toggleDarkMode }) {
                 {[
                   { label: "Name", value: name, set: setName },
                   { label: "Email", value: email, set: setEmail },
+                  { label: "Password", value: password, set: setPassword },
                   { label: "CGPA", value: cgpa, set: setCgpa },
                   { label: "Aptitude", value: aptitude, set: setAptitude },
                   { label: "Coding", value: coding, set: setCoding }
@@ -336,15 +361,9 @@ function App({ darkMode, toggleDarkMode }) {
                 >
 
                   <MenuItem value="All">All</MenuItem>
-                  <MenuItem value="Placement Ready">
-                    Placement Ready
-                  </MenuItem>
-                  <MenuItem value="Needs Improvement">
-                    Needs Improvement
-                  </MenuItem>
-                  <MenuItem value="High Risk">
-                    High Risk
-                  </MenuItem>
+                  <MenuItem value="Placement Ready">Placement Ready</MenuItem>
+                  <MenuItem value="Needs Improvement">Needs Improvement</MenuItem>
+                  <MenuItem value="High Risk">High Risk</MenuItem>
 
                 </TextField>
 
@@ -380,8 +399,21 @@ function App({ darkMode, toggleDarkMode }) {
                   </Typography>
 
                   <Typography>
-                    Score: {user.placementScore?.toFixed(2)}
+                    Placement Score: {user.placementScore?.toFixed(2)}
                   </Typography>
+
+                  {/* Probability Bar */}
+
+                  <Box sx={{ mt: 2, mb: 1 }}>
+                    <Typography variant="body2">
+                      Placement Probability
+                    </Typography>
+
+                    <LinearProgress
+                      variant="determinate"
+                      value={getProbability(user.placementScore)}
+                    />
+                  </Box>
 
                   <Typography sx={{ mb: 2 }}>
                     {getRecommendation(user.placementScore)}
