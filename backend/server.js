@@ -30,67 +30,41 @@ const auth = (req, res, next) => {
 
 // ================= BASIC ROUTE =================
 app.get("/", (req, res) => {
-  res.json({ message: "Backend Running Securely 🚀" });
+  res.json({ message: "Backend Running 🚀" });
 });
 
-// ================= REGISTER =================
-app.post("/register", async (req, res) => {
-  try {
-    const {
-      name,
-      email,
-      password,
-      role,
-      cgpa,
-      aptitudeScore,
-      codingScore
-    } = req.body;
 
-    if (!name || !email || !password)
-      return res.status(400).json({ message: "Name, email & password required" });
+// =================================================
+// 🔥 DEFAULT ADMIN CREATION
+// =================================================
+const createDefaultAdmin = async () => {
+  const adminExists = await User.findOne({ role: "admin" });
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser)
-      return res.status(400).json({ message: "Email already exists" });
+  if (!adminExists) {
+    const hashedPassword = await bcrypt.hash("admin123", 10);
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const finalCgpa = cgpa || 0;
-    const finalAptitude = aptitudeScore || 0;
-    const finalCoding = codingScore || 0;
-
-    const placementScore =
-      0.4 * finalCoding +
-      0.3 * finalAptitude +
-      0.3 * (finalCgpa * 10);
-
-    let category = "High Risk";
-    if (placementScore >= 75) category = "Placement Ready";
-    else if (placementScore >= 50) category = "Needs Improvement";
-
-    const newUser = new User({
-      name,
-      email,
+    await User.create({
+      name: "Main Admin",
+      email: "admin@placement.com",
       password: hashedPassword,
-      role: role || "student",
-      cgpa: finalCgpa,
-      aptitudeScore: finalAptitude,
-      codingScore: finalCoding,
-      placementScore,
-      category,
-      improvementPlan: []
+      role: "admin",
+      cgpa: 0,
+      aptitudeScore: 0,
+      codingScore: 0,
+      placementScore: 0,
+      category: "Admin"
     });
 
-    await newUser.save();
-
-    res.status(201).json({ message: "User Registered Successfully" });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.log("✅ Default Admin Created");
+    console.log("📧 Email: admin@placement.com");
+    console.log("🔐 Password: admin123");
   }
-});
+};
 
-// ================= LOGIN =================
+
+// =================================================
+// 🔐 LOGIN
+// =================================================
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -107,36 +81,71 @@ app.post("/login", async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    res.json({ token, role: user.role, id: user._id });
+    res.json({
+      token,
+      role: user.role,
+      id: user._id
+    });
 
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ================= RESET PASSWORD =================
-app.put("/reset-password", async (req, res) => {
+
+// =================================================
+// 👨‍💼 ADMIN CREATES STUDENT
+// =================================================
+app.post("/create-student", auth, async (req, res) => {
   try {
-    const { email, newPassword } = req.body;
+    if (req.user.role !== "admin")
+      return res.status(403).json({ message: "Only admin can create students" });
 
-    if (!email || !newPassword)
-      return res.status(400).json({ message: "Email and new password required" });
+    const { name, email, password, cgpa = 0, aptitudeScore = 0, codingScore = 0 } = req.body;
 
-    const user = await User.findOne({ email });
-    if (!user)
-      return res.status(404).json({ message: "User not found" });
+    if (!name || !email || !password)
+      return res.status(400).json({ message: "Name, email & password required" });
 
-    user.password = await bcrypt.hash(newPassword, 10);
-    await user.save();
+    const existingUser = await User.findOne({ email });
+    if (existingUser)
+      return res.status(400).json({ message: "Email already exists" });
 
-    res.json({ message: "Password updated successfully" });
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const placementScore =
+      0.4 * codingScore +
+      0.3 * aptitudeScore +
+      0.3 * (cgpa * 10);
+
+    let category = "High Risk";
+    if (placementScore >= 75) category = "Placement Ready";
+    else if (placementScore >= 50) category = "Needs Improvement";
+
+    const student = new User({
+      name,
+      email,
+      password: hashedPassword,
+      role: "student",
+      cgpa,
+      aptitudeScore,
+      codingScore,
+      placementScore,
+      category
+    });
+
+    await student.save();
+
+    res.status(201).json({ message: "Student created successfully" });
 
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ================= GET USERS =================
+
+// =================================================
+// 👁 GET USERS
+// =================================================
 app.get("/users", auth, async (req, res) => {
   try {
     if (req.user.role === "admin") {
@@ -151,39 +160,10 @@ app.get("/users", auth, async (req, res) => {
   }
 });
 
-// ================= UPDATE SCORE =================
-app.put("/update-score/:id", auth, async (req, res) => {
-  try {
-    const { aptitudeScore = 0, codingScore = 0 } = req.body;
 
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    if (req.user.role !== "admin" && req.user.id !== user._id.toString())
-      return res.status(403).json({ message: "Not allowed" });
-
-    user.aptitudeScore = aptitudeScore;
-    user.codingScore = codingScore;
-
-    user.placementScore =
-      0.4 * codingScore +
-      0.3 * aptitudeScore +
-      0.3 * (user.cgpa * 10);
-
-    if (user.placementScore < 50) user.category = "High Risk";
-    else if (user.placementScore < 75) user.category = "Needs Improvement";
-    else user.category = "Placement Ready";
-
-    await user.save();
-
-    res.json({ message: "Score updated", user });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ================= DELETE USER =================
+// =================================================
+// 🗑 DELETE STUDENT (ADMIN ONLY)
+// =================================================
 app.delete("/delete/:id", auth, async (req, res) => {
   try {
     if (req.user.role !== "admin")
@@ -197,11 +177,20 @@ app.delete("/delete/:id", auth, async (req, res) => {
   }
 });
 
-// ================= DATABASE =================
+
+// =================================================
+// 🔄 DATABASE CONNECTION
+// =================================================
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB Connected ✅"))
+  .then(async () => {
+    console.log("MongoDB Connected ✅");
+    await createDefaultAdmin();
+  })
   .catch(err => console.log("Mongo Error:", err));
 
-// ================= SERVER =================
+
+// =================================================
+// 🚀 SERVER START
+// =================================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
