@@ -15,6 +15,15 @@ import {
   LinearProgress
 } from "@mui/material";
 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid
+} from "recharts";
+
 function App({ darkMode, toggleDarkMode }) {
 
   const API = "https://placement-intelligence-system-qdov.onrender.com";
@@ -49,9 +58,10 @@ function App({ darkMode, toggleDarkMode }) {
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
 
+  const [completedTasks, setCompletedTasks] = useState({});
+
   // ================= FETCH USERS =================
   const fetchUsers = useCallback(async () => {
-
     try {
 
       const res = await fetch(`${API}/users`, {
@@ -162,6 +172,63 @@ function App({ darkMode, toggleDarkMode }) {
 
   };
 
+  // ================= PROGRESS =================
+  const getProbability = (score) => {
+    if (!score) return 0;
+    return Math.min(score, 100);
+  };
+
+  // ================= CHART DATA =================
+  const getChartData = (user) => [
+    { name: "CGPA", value: user.cgpa * 10 },
+    { name: "Aptitude", value: user.aptitudeScore },
+    { name: "Coding", value: user.codingScore },
+    { name: "Placement", value: user.placementScore }
+  ];
+
+  // ================= STUDY PLAN =================
+  const getStudyPlan = (user) => {
+
+    if (user.placementScore >= 75) {
+      return [
+        "Solve 2 Mock Tests",
+        "Practice HR Questions",
+        "Revise Core Subjects"
+      ];
+    }
+
+    if (user.placementScore >= 50) {
+      return [
+        "Practice Aptitude Questions",
+        "Solve Coding Problems",
+        "Watch DSA Tutorials"
+      ];
+    }
+
+    return [
+      "Learn Basic Aptitude",
+      "Practice Beginner Coding",
+      "Revise Programming Basics"
+    ];
+  };
+
+  const toggleTask = (userId, index) => {
+
+    setCompletedTasks((prev) => {
+
+      const userTasks = prev[userId] || [];
+
+      userTasks[index] = !userTasks[index];
+
+      return {
+        ...prev,
+        [userId]: [...userTasks]
+      };
+
+    });
+
+  };
+
   // ================= FILTER =================
   const filteredUsers = users.filter((user) => {
 
@@ -198,14 +265,6 @@ function App({ darkMode, toggleDarkMode }) {
 
   };
 
-  const getProbability = (score) => {
-
-    if (!score) return 0;
-
-    return Math.min(score, 100);
-
-  };
-
   // ================= LOGIN PROTECTION =================
   if (!isLoggedIn) {
     return <Login onLogin={() => setIsLoggedIn(true)} />;
@@ -217,19 +276,13 @@ function App({ darkMode, toggleDarkMode }) {
 
       <Box sx={{ padding: 3 }}>
 
-        {/* TOP BUTTONS */}
-
         <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
 
           <Button variant="contained" onClick={toggleDarkMode}>
             {darkMode ? "Light Mode" : "Dark Mode"}
           </Button>
 
-          <Button
-            variant="outlined"
-            color="error"
-            onClick={handleLogout}
-          >
+          <Button variant="outlined" color="error" onClick={handleLogout}>
             Logout
           </Button>
 
@@ -272,62 +325,6 @@ function App({ darkMode, toggleDarkMode }) {
 
         </Grid>
 
-        {/* ADD STUDENT */}
-
-        {role === "admin" && (
-
-          <Card sx={{ mb: 4 }}>
-            <CardContent>
-
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                {editingUser ? "Edit Student" : "Add Student"}
-              </Typography>
-
-              <Grid container spacing={2}>
-
-                {[
-                  { label: "Name", value: name, set: setName },
-                  { label: "Email", value: email, set: setEmail },
-                  { label: "Password", value: password, set: setPassword },
-                  { label: "CGPA", value: cgpa, set: setCgpa },
-                  { label: "Aptitude", value: aptitude, set: setAptitude },
-                  { label: "Coding", value: coding, set: setCoding }
-                ].map((field, i) => (
-
-                  <Grid item xs={12} md={2} key={i}>
-
-                    <TextField
-                      fullWidth
-                      label={field.label}
-                      value={field.value}
-                      onChange={(e) =>
-                        field.set(e.target.value)
-                      }
-                    />
-
-                  </Grid>
-
-                ))}
-
-                <Grid item xs={12} md={2}>
-
-                  <Button
-                    variant="contained"
-                    fullWidth
-                    onClick={handleAddStudent}
-                  >
-                    {editingUser ? "Update" : "Add"}
-                  </Button>
-
-                </Grid>
-
-              </Grid>
-
-            </CardContent>
-          </Card>
-
-        )}
-
         {/* SEARCH */}
 
         <Card sx={{ mb: 3 }}>
@@ -339,7 +336,7 @@ function App({ darkMode, toggleDarkMode }) {
 
                 <TextField
                   fullWidth
-                  label="Search by Name"
+                  label="Search Student"
                   value={search}
                   onChange={(e) =>
                     setSearch(e.target.value)
@@ -353,7 +350,7 @@ function App({ darkMode, toggleDarkMode }) {
                 <TextField
                   fullWidth
                   select
-                  label="Filter by Category"
+                  label="Filter"
                   value={filterCategory}
                   onChange={(e) =>
                     setFilterCategory(e.target.value)
@@ -390,21 +387,16 @@ function App({ darkMode, toggleDarkMode }) {
                     {user.name}
                   </Typography>
 
-                  <Typography>
-                    Email: {user.email}
-                  </Typography>
-
-                  <Typography>
-                    CGPA: {user.cgpa}
-                  </Typography>
+                  <Typography>Email: {user.email}</Typography>
+                  <Typography>CGPA: {user.cgpa}</Typography>
 
                   <Typography>
                     Placement Score: {user.placementScore?.toFixed(2)}
                   </Typography>
 
-                  {/* Probability Bar */}
+                  {/* Probability */}
 
-                  <Box sx={{ mt: 2, mb: 1 }}>
+                  <Box sx={{ mt: 2 }}>
                     <Typography variant="body2">
                       Placement Probability
                     </Typography>
@@ -415,53 +407,47 @@ function App({ darkMode, toggleDarkMode }) {
                     />
                   </Box>
 
-                  <Typography sx={{ mb: 2 }}>
+                  <Typography sx={{ mt: 1 }}>
                     {getRecommendation(user.placementScore)}
                   </Typography>
 
-                  {role === "admin" && (
+                  {/* Chart */}
 
-                    <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+                  <BarChart
+                    width={320}
+                    height={200}
+                    data={getChartData(user)}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="value" />
+                  </BarChart>
 
-                      <Button
-                        variant="outlined"
-                        onClick={() => handleEdit(user)}
-                      >
-                        Edit
-                      </Button>
+                  {/* Study Plan */}
 
-                      <Button
-                        variant="outlined"
-                        color="error"
-                        onClick={() => handleDelete(user._id)}
-                      >
-                        Delete
-                      </Button>
+                  <Typography variant="h6" sx={{ mt: 2 }}>
+                    Study Plan
+                  </Typography>
+
+                  {getStudyPlan(user).map((task, index) => (
+
+                    <Box key={index} sx={{ display: "flex", gap: 1 }}>
+
+                      <input
+                        type="checkbox"
+                        checked={completedTasks[user._id]?.[index] || false}
+                        onChange={() =>
+                          toggleTask(user._id, index)
+                        }
+                      />
+
+                      <Typography>{task}</Typography>
 
                     </Box>
 
-                  )}
-
-                  <Button
-                    variant="outlined"
-                    onClick={() =>
-                      setSelectedUser(user._id)
-                    }
-                  >
-                    Start Aptitude Test
-                  </Button>
-
-                  {selectedUser === user._id && (
-
-                    <AptitudeTest
-                      userId={user._id}
-                      onFinish={() => {
-                        setSelectedUser(null);
-                        fetchUsers();
-                      }}
-                    />
-
-                  )}
+                  ))}
 
                 </CardContent>
 
